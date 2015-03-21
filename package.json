@@ -1,0 +1,14 @@
+{
+  "name": "torrent-cleaner",
+  "version": "0.0.1",
+  "dependencies": {
+    "arg-parser": "^1.1.0",
+    "copy-file": "0.0.1",
+    "faker": "^2.1.2",
+    "file-exists": "^0.1.1",
+    "makedir": "0.0.11",
+    "parse-torrent-file": "^2.1.2",
+    "scan-fs": "0.0.4",
+    "underscore": "^1.8.2"
+  }
+}
