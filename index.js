@@ -12,8 +12,6 @@ var fsScaner = require("scan-fs").create()
 
 var path = require("path")
 
-var faker = require("faker")
-
 var copy = require("copy-file")
 
 var exists = require("file-exists")
@@ -22,7 +20,7 @@ var makedirUtil = require("makedir").makedir
 
 var Args = require('arg-parser')
 
-var sparkWord = require('./spark_word')
+var faker = require('./src/faker')
 
 
 ////////////////////////////////////////////
@@ -83,36 +81,6 @@ var defaults = {
 	}(),
 }
 
-// =========================================== \\
-// facker
-// =========================================== //
-var FACKER_FACTOR = [
-	String.fromCharCode(773) + String.fromCharCode(818), // transmute
-	String.fromCharCode(816), // underline
-	String.fromCharCode(1161), // Ass
-	String.fromCharCode(822), // strikeout
-];
-
-function newFacker(str, factorIndex) {
-	var i, j, factor, ret;
-
-	factorIndex = factorIndex ? factorIndex : 0;
-	factor = FACKER_FACTOR[factorIndex]; // 2386
-    ret = '';
-
-    str = str.replace(FACKER_FACTOR[0], '')
-    		.replace(FACKER_FACTOR[1], '')
-    		.replace(FACKER_FACTOR[2], '')
-    		.replace(FACKER_FACTOR[3], '');
-
-    str = sparkWord.string(str);
-
-    for (i = 0, j = str.length; i < j; i++) {
-        ret += str.charAt(i) + factor;
-    }
-
-    return ret;
-}
 
 // Utility to make directory
 function mkdir(dir) {
@@ -120,14 +88,6 @@ function mkdir(dir) {
 		if(err) throw new Error (err)
 	})
 }
-
-//////////////////////////////////
-//
-// Set the locale of faker
-//
-//////////////////////////////////
-faker.locale = "en_US"
-
 
 ///////////////////////////////////////////
 //
@@ -194,10 +154,10 @@ function doClean(filePath) {
 				throw err
 			} else {
 				// Copy the success to success path
-				var successPath = defaults.success_dir + path.sep + fileName
+				// var successPath = defaults.success_dir + path.sep + fileName
 
 				fs.unlinkSync(filePath)
-				//fs.renameSync(filePath, successPath)
+				// fs.renameSync(filePath, successPath)
 			}
 		})
 	})
@@ -214,60 +174,64 @@ function isTorrent(filePath) {
 	return '.torrent' === path.extname(filePath)
 }
 
+function parseExtname(filename) {
+	var extname = path.extname(filename)
+	var isValidExtname = /^\.[a-zA-Z0-9]+$/.test(extname)
+	if (!isValidExtname) {
+		extname = ''
+	}
+	return extname
+}
+
+var cleaner = {
+ 	// for single file
+ 	single: function single(parsed) {
+	 	var info = parsed.info
+	 	// Get the extname of current file.
+	 	var extname = parseExtname(parsed.name)
+	 	// Fake the basename of current file
+	 	var basename = faker(path.basename(parsed.name, extname))
+	 	// Generate a new for the file
+	 	var newname = basename + extname
+
+	 	info.name = info['name.utf-8'] = new Buffer(newname)
+
+	 	return parsed
+ 	},
+
+ 	// for multiple files
+ 	multiple: function multiple(parsed) {
+ 		var info = parsed.info
+ 		var files = parsed.files
+ 		var basedir = faker(parsed.name)
+
+ 		// Fake base directory
+ 		info.name = info['name.utf-8'] = new Buffer(basedir)
+
+ 		_.forEach(files, function(file, i) {
+	 		// Get the extname of current file.
+	 		var extname = parseExtname(file.name)
+	 		var basename = faker(path.basename(file.name, extname))
+	 		// Generate a new name for current file
+	 		var newname = basename + extname
+
+			info.files[i].path = info.files[i]['path.utf-8'] = [ new Buffer(newname) ]
+ 		})
+
+ 		return parsed
+ 	}
+}
+
 
 /**
  * Clean data
  */
  function clean(parsed) {
-
- 	var basedir = parsed.name
- 	var info = parsed.info
- 	var files = parsed.files
- 	var nameParsed = false
-
- 	// print(parsed)
-
- 	//info.name = info['name.utf-8'] = new Buffer(faker.name.findName()
-
- 	_.forEach(files, function(file, i) {
- 		// Get the extname of current file.
- 		var ext = path.extname(file.name)
-
- 		var basename = newFacker(path.basename(file.name, ext)).replace(/\./g, '')
-
- 		// Generate a new for the file
- 		var newName = basename + ext
- 		
- 		// Translate string to buffer.
- 		var buf = new Buffer(newName)
-
- 		if (parsed.name === file.name) {
- 			info.name = info['name.utf-8'] = newName
- 		}
-		file.path = file.name = newName
-
- 		// Save the new name to info.
- 		// If there is only one file in the torrent, the name is the file name,
- 		// otherwise, the file information are stored in info.files.
- 		if (!nameParsed) {
-
- 			if (parsed.name === file.name) {
- 				info.name = info['name.utf-8'] = buf
- 			} else {
- 				info.name = info['name.utf-8'] = new Buffer(newFacker(parsed.name))
- 			}
-
- 			nameParsed = true
- 		}
-
- 		// The index of file name in the paths array. 
-		//var nI = info.files[i].path.length - 1
-		if (info.files && info.files.length) {
-			info.files[i].path = info.files[i]['path.utf-8'] = [buf]
-		}
- 	})
-
- 	return parsed
+ 	if (parsed.files.length > 1) {
+ 		return cleaner.multiple(parsed)
+ 	} else {
+ 		return cleaner.single(parsed)
+ 	}
  }
 
  function print(parsed) {
