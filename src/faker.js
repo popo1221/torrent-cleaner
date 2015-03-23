@@ -25,7 +25,7 @@ function faker(str, factorIndex) {
     str = str.replace(REPALCE_HOLDER, '');
 
     // No spark word
-    // str = sparkWord.string(str);
+    str = sparkWord.string(str);
 
     for (i = 0, j = str.length; i < j; i++) {
         ret += str.charAt(i) + factor;
